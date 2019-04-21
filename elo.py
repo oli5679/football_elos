@@ -2,7 +2,7 @@ from collections import Counter
 import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
-
+import random
 class Tournament:
     def __init__(self, ratings, tree, k_factor=5):
         self.ratings = ratings
@@ -11,8 +11,7 @@ class Tournament:
 
     def sim_tournament(self, tree):
         """
-        Recursive simulate tournament rounds. Takes tree (draw fixtures in nested list). 
-        Requires global 'latest elos' dict and k_factor constant
+        Recursive simulate tournament rounds. Takes tree - draw fixtures in nested list. 
         """
         # Base case (single game)
         if isinstance(tree[0], str):
@@ -38,8 +37,10 @@ class Tournament:
         return q1/(q1+q2)
     
     def sim_game_and_update_elos(self, teams):
-        """Sims a game between two teams, returning name of winning team. 
-        Also updates global 'team_elos' values (hot sim)"""        
+        """
+        Sims a game between two teams, returning name of winning team. 
+        Also updates elo values (hot sim)
+        """        
         team_1, team_2 = teams
        
         # How likely is 1st team to win
@@ -65,9 +66,20 @@ class League:
         self.k_factor = k_factor
         self.draw_rate = draw_rate
 
-    def sim(self):
+    def sim_league(self):
+        '''
+        Simulates a league's final standings:
+            returns - standings: dict - teams' points totals
+                    rankings:    dict - teams' league positions
+        NOTE - doesn't account for goal difference
+        '''
         for teams in self.fixtures:
             self.sim_game(teams)
+        
+        # Add random small number, instead of goal difference
+        for k in self.standings.keys():
+            self.standings[k] += (random.random() * 0.0001)
+
         final_rankings = {} 
         r = 0
         for i in dict(sorted(self.standings.items(), 
@@ -78,34 +90,50 @@ class League:
 
     def get_outcome_probs(self, team_1, team_2):
         """
-        Gets the chance of first team winning, 
+        Gets the chance of first team winning, drawing or losing
         given two teams current elo ratings
         formula for elo: e1 = 10^(r1/400)/[10^(r1/400) + 10^(r2/400)]
+        
+        drawing rate = self.draw_rate (except when winning/ losing chance is below draw rate,
+        where it it 1/2 winning/losing chance). This means proportion of draws will be slightly lower
+        than draw rate
         """
         rating_1 = self.ratings[team_1]/400
         rating_2 = self.ratings[team_2]/400
         q1 = 10.0 ** rating_1
         q2 = 10.0 ** rating_2
         e1 = q1/(q1+q2)
-        win1 = e1 * (1.0-self.draw_rate)
-        draw1 = min(e1 * (self.draw_rate * 2), 1.0-win1)
-        return e1, (win1, draw1, 1.0 - win1 - draw1)
+        
+        # Constant draw rate, except in cases where winning/losing prob exceeds draw rate
+        # Leads to a hill shaped draw prob, increasing linearly, flat, and then decreasing
+        if e1 < self.draw_rate:
+            draw_1 = e1 / 2
+        elif e1 > (1.0 - self.draw_rate):
+            draw_1 = (1 - e1) / 2
+        else:
+            draw_1 = self.draw_rate
+        
+        win_1 = e1 - (draw_1 / 2)
+        
+        return e1, (win_1, draw_1, 1.0 - win_1 - draw_1)
     
     def sim_game(self, teams):
-        """Sims a game between two teams, returning name of winning team. 
-        Also updates global 'team_elos' values (hot sim)"""        
+        """
+        Sims a game between two teams, updating standings table
+        Also updates ratings (hot sim)
+        """        
         team_1, team_2 = teams
        
         # How likely is 1st team to win
-        win_prob, probs = self.get_outcome_probs(team_1, team_2)
+        e_1, probs = self.get_outcome_probs(team_1, team_2)
         outcome = np.random.choice(a=[1,0.5,0],size=1, p=probs)[0]
 
         
         # Update both winner and loser ratings
-        self.ratings[team_1] += (outcome-win_prob)*self.k_factor
-        self.ratings[team_2] += (win_prob-outcome)*self.k_factor
+        self.ratings[team_1] += (outcome-e_1)*self.k_factor
+        self.ratings[team_2] += (e_1-outcome)*self.k_factor
         
-        # Return winner's name
+        # Update league
         if outcome == 1:
             self.standings[team_1] += 3
         if outcome == 0.5:
@@ -113,7 +141,7 @@ class League:
             self.standings[team_2] += 1
         else:
             self.standings[team_2] += 3
-
+        return outcome
 
 def sim_multiple_tournaments(tree, elo_dict, n=10000):
     "Simulates tournament n times, returns each team's win % in counter" 
@@ -127,13 +155,48 @@ def sim_multiple_tournaments(tree, elo_dict, n=10000):
         win_count[winner] += (100.0/n)
     return win_count
 
+def sim_multiple_leagues(ratings, standings, fixtures, sample_num, k_factor =5, draw_rate =0.3):
+    '''
+    Simulates tournament multiple times
+    returns:
+        list of dictionaries - points totals
+        list of dictionaries - league positions
+    '''
+    
+    points_totals = []
+    rankings = []
+    for i, _ in enumerate(range(sample_num)):
+        if i % 1000 == 0: print(f'{i}/{sample_num}',end='')
+        l = League(ratings=deepcopy(ratings),
+              standings=deepcopy(standings),
+              fixtures=deepcopy(fixtures),
+              k_factor=k_factor,
+              draw_rate=draw_rate)
+        final_points, final_rankings = l.sim_league()
+        points_totals.append(final_points)
+        rankings.append(final_rankings)
+    return points_totals, rankings
+
 
 def plot_counter(plt_data, title):
-    'Creates bar plot of win probs'
+    '''
+    Creates bar plot of win probs from a dictionary/counter
+    '''
     labels, values = zip(*sorted(plt_data.items()))
     indexes = np.arange(len(labels))
     plt.bar(indexes, values, 1)
     plt.xticks(indexes, labels, rotation=90)
     plt.ylabel("Tournament win prob. (%)")
+    plt.title(title)
+    plt.show()
+
+def plot_series(labels, values, title):
+    '''
+    Create a bar plot of outcome probabilities from a series of values, and labels
+    '''
+    indexes = np.arange(len(labels))
+    plt.bar(indexes, values, 1)
+    plt.xticks(indexes, labels, rotation=45)
+    plt.ylabel("prob. (%)")
     plt.title(title)
     plt.show()
