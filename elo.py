@@ -3,6 +3,8 @@ import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
 import random
+from IPython.display import clear_output
+
 class Tournament:
     def __init__(self, ratings, tree, k_factor=5):
         self.ratings = ratings
@@ -59,12 +61,13 @@ class Tournament:
 
 
 class League:
-    def __init__(self, ratings, standings, fixtures, k_factor=5, draw_rate=0.3):
+    def __init__(self, ratings, standings, fixtures, k_factor=5, draw_rate=0.3,home_advantage=0.2):
         self.ratings = ratings
         self.standings = standings
         self.fixtures = fixtures
         self.k_factor = k_factor
         self.draw_rate = draw_rate
+        self.home_advantage = home_advantage
 
     def sim_league(self):
         '''
@@ -103,6 +106,8 @@ class League:
         q1 = 10.0 ** rating_1
         q2 = 10.0 ** rating_2
         e1 = q1/(q1+q2)
+
+        e1 += ((1-e1) * self.home_advantage)
         
         # Constant draw rate, except in cases where winning/losing prob exceeds draw rate
         # Leads to a hill shaped draw prob, increasing linearly, flat, and then decreasing
@@ -114,7 +119,6 @@ class League:
             draw_1 = self.draw_rate
         
         win_1 = e1 - (draw_1 / 2)
-        
         return e1, (win_1, draw_1, 1.0 - win_1 - draw_1)
     
     def sim_game(self, teams):
@@ -127,7 +131,6 @@ class League:
         # How likely is 1st team to win
         e_1, probs = self.get_outcome_probs(team_1, team_2)
         outcome = np.random.choice(a=[1,0.5,0],size=1, p=probs)[0]
-
         
         # Update both winner and loser ratings
         self.ratings[team_1] += (outcome-e_1)*self.k_factor
@@ -155,18 +158,20 @@ def sim_multiple_tournaments(tree, elo_dict, n=10000):
         win_count[winner] += (100.0/n)
     return win_count
 
-def sim_multiple_leagues(ratings, standings, fixtures, sample_num, k_factor =5, draw_rate =0.3):
+def sim_multiple_leagues(ratings, standings, fixtures, sample_num, 
+                         k_factor =5, draw_rate =0.3,home_advantage=0.2):
     '''
     Simulates tournament multiple times
     returns:
         list of dictionaries - points totals
         list of dictionaries - league positions
     '''
-    
     points_totals = []
     rankings = []
     for i, _ in enumerate(range(sample_num)):
-        if i % 1000 == 0: print(f'{i}/{sample_num}',end='')
+        if i % 1000 == 0: 
+            clear_output()
+            print(f'{i}/{sample_num}')
         l = League(ratings=deepcopy(ratings),
               standings=deepcopy(standings),
               fixtures=deepcopy(fixtures),
@@ -200,3 +205,11 @@ def plot_series(labels, values, title):
     plt.ylabel("prob. (%)")
     plt.title(title)
     plt.show()
+    
+    
+def flatten_draw(draw):
+    flattened = []
+    if type(draw[0]) == str:
+        return draw
+    else:
+        return flatten_draw(draw[0]) + flatten_draw(draw[1])
