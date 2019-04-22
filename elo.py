@@ -61,7 +61,7 @@ class Tournament:
 
 
 class League:
-    def __init__(self, ratings, standings, fixtures, k_factor=5, draw_rate=0.3,home_advantage=0.2):
+    def __init__(self, ratings, standings, fixtures, k_factor=5, draw_rate=0.3,home_advantage=0.3):
         self.ratings = ratings
         self.standings = standings
         self.fixtures = fixtures
@@ -100,6 +100,9 @@ class League:
         drawing rate = self.draw_rate (except when winning/ losing chance is below draw rate,
         where it it 1/2 winning/losing chance). This means proportion of draws will be slightly lower
         than draw rate
+
+        home advantage - increases probability of home team winning proportionate to  home advantage factor
+        * closeness of fixture.
         """
         rating_1 = self.ratings[team_1]/400
         rating_2 = self.ratings[team_2]/400
@@ -107,7 +110,7 @@ class League:
         q2 = 10.0 ** rating_2
         e1 = q1/(q1+q2)
 
-        e1 += ((1-e1) * self.home_advantage)
+        e1 += (e1 * (1-e1) * self.home_advantage)
         
         # Constant draw rate, except in cases where winning/losing prob exceeds draw rate
         # Leads to a hill shaped draw prob, increasing linearly, flat, and then decreasing
@@ -159,7 +162,7 @@ def sim_multiple_tournaments(tree, elo_dict, n=10000):
     return win_count
 
 def sim_multiple_leagues(ratings, standings, fixtures, sample_num, 
-                         k_factor =5, draw_rate =0.3,home_advantage=0.2):
+                         k_factor =5, draw_rate =0.3,home_advantage=0.3):
     '''
     Simulates tournament multiple times
     returns:
