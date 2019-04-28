@@ -21,7 +21,7 @@ def update_ratings():
     rating_df['Elo'] = pd.to_numeric(rating_df['Elo'])
     rating_df['date'] = str(datetime.datetime.now())
     rating_df[['Club','Elo','date']].to_csv('data/ratings_latest.csv',index=False)
-    
+    driver.quit()
     print('Done!')
     
 def filter_ratings(ratings_df, team_list):
