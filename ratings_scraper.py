@@ -17,8 +17,6 @@ def update_ratings():
     sleep(1)
 
     rating_df = pd.read_html(driver.page_source,match='Club')[0]
-    rating_df.columns = rating_df.iloc[0]
-    rating_df = rating_df.iloc[1:]
     rating_df.loc[:,'Club'] = rating_df['Club'].str.replace('^\d+', '').str.strip()
     rating_df['Elo'] = pd.to_numeric(rating_df['Elo'])
     rating_df['date'] = str(datetime.datetime.now())

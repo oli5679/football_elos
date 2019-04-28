@@ -15,6 +15,10 @@ class Tournament:
         """
         Recursive simulate tournament rounds. Takes tree - draw fixtures in nested list. 
         """
+        # Base case (single player)
+        if isinstance(tree, str):
+            return tree
+        
         # Base case (single game)
         if isinstance(tree[0], str):
             return self.sim_game_and_update_elos(tree)
@@ -179,14 +183,15 @@ def sim_multiple_leagues(ratings, standings, fixtures, sample_num,
               standings=deepcopy(standings),
               fixtures=deepcopy(fixtures),
               k_factor=k_factor,
-              draw_rate=draw_rate)
+              draw_rate=draw_rate
+              ,home_advantage=home_advantage)
         final_points, final_rankings = l.sim_league()
         points_totals.append(final_points)
         rankings.append(final_rankings)
     return points_totals, rankings
 
 
-def plot_counter(plt_data, title):
+def plot_counter(plt_data, title, plot_name = None):
     '''
     Creates bar plot of win probs from a dictionary/counter
     '''
@@ -196,6 +201,7 @@ def plot_counter(plt_data, title):
     plt.xticks(indexes, labels, rotation=90)
     plt.ylabel("Tournament win prob. (%)")
     plt.title(title)
+    if plot_name is not None: plt.savefig(plot_name)
     plt.show()
 
 def plot_series(labels, values, title):
