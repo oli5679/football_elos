@@ -1,3 +1,5 @@
+# This is a bit messy!
+
 # elo_simulator
 
 ## Simple Elo simulation of a sports tournament
